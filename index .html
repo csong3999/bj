@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云端报价系统 (Firebase版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        /* 样式保持不变，简洁美观 */
+        :root { --primary-color: #2563eb; --sidebar-bg: #1e293b; --text-light: #f8fafc; --bg-color: #f1f5f9; --border-color: #e2e8f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: var(--bg-color); color: #334155; }
+        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: var(--text-light); display: flex; flex-direction: column; padding: 20px; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
+        .brand-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 40px; text-align: center; letter-spacing: 1px; }
+        .nav-btn { background: rgba(255,255,255,0.1); color: white; border: none; padding: 12px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.3s; font-size: 14px; }
+        .nav-btn:hover { background: var(--primary-color); }
+        .status-indicator { margin-top: auto; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; }
+        .dot.online { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; }
+        .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        thead { background-color: #f8fafc; border-bottom: 2px solid var(--border-color); }
+        th { text-align: left; padding: 16px; font-weight: 600; color: #64748b; }
+        td { padding: 16px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+        tr:hover { background-color: #f8fafc; }
+        .product-img-thumb { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #eee; border: 1px solid #e2e8f0; }
+        .price-badge { font-weight: bold; color: #059669; background: #ecfdf5; padding: 4px 8px; border-radius: 4px; }
+        .no-price { color: #94a3b8; font-style: italic; font-size: 0.9em; }
+        .action-btn { padding: 6px 12px; border: 1px solid var(--border-color); background: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-right: 5px; transition: 0.2s; }
+        .action-btn.view-chart { color: var(--primary-color); border-color: var(--primary-color); }
+        .action-btn.view-chart:hover { background: var(--primary-color); color: white; }
+        .action-btn.delete { color: #ef4444; border-color: #ef4444; }
+        .action-btn.delete:hover { background: #ef4444; color: white; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative; }
+        .modal-lg { width: 800px; }
+        .close-modal { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #94a3b8; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
+        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="brand-title">报价系统 Cloud</div>
+        <button class="nav-btn" onclick="openModal('addProductModal')">+ 新增产品</button>
+        <button class="nav-btn" onclick="openModal('addQuoteModal')">+ 录入报价</button>
+        
+        <div class="status-indicator">
+            <div class="dot" id="connectionDot"></div>
+            <span id="connectionText">连接中...</span>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="header-section">
+            <h2>云端产品列表</h2>
+            <div style="color: #64748b; font-size: 0.9rem;" id="currentDateDisplay"></div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="80">图片</th>
+                        <th>品牌</th>
+                        <th>产品名称</th>
+                        <th>今日报价</th>
+                        <th>最新报价日期</th>
+                        <th width="200">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="productTableBody">
+                    <tr><td colspan="6" style="text-align:center; padding:40px;">正在从云端加载数据...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <div id="addProductModal" class="modal-overlay">
+        <div class="modal">
+            <span class="close-modal" onclick="closeModal('addProductModal')">&times;</span>
+            <h3>新增产品</h3>
+            <div class="form-group"><label>品牌</label><input type="text" id="newBrand"></div>
+            <div class="form-group"><label>型号</label><input type="text" id="newName"></div>
+            <div class="form-group"><label>图片</label><input type="file" id="newImg" accept="image/*"></div>
+            <button class="btn-primary" onclick="handleAddProduct()">确认添加</button>
+        </div>
+    </div>
+
+    <div id="addQuoteModal" class="modal-overlay">
+        <div class="modal">
+            <span class="close-modal" onclick="closeModal('addQuoteModal')">&times;</span>
+            <h3>录入报价</h3>
+            <div class="form-group"><label>选择产品</label><select id="quoteProductSelect"></select></div>
+            <div class="form-group"><label>日期</label><input type="date" id="quoteDate"></div>
+            <div class="form-group"><label>价格 (CNY)</label><input type="number" id="quotePrice"></div>
+            <button class="btn-primary" onclick="handleAddQuote()">保存报价</button>
+        </div>
+    </div>
+
+    <div id="chartModal" class="modal-overlay">
+        <div class="modal modal-lg">
+            <span class="close-modal" onclick="closeModal('chartModal')">&times;</span>
+            <h3 id="chartTitle">价格走势</h3>
+            <div style="height: 400px; width: 100%;"><canvas id="trendChart"></canvas></div>
+        </div>
+    </div>
+
+<script>
+    // ==========================================
+    // ⚠️ 此处填入你的 Firebase 配置信息 ⚠️
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDsMAUeq9WtEQ4Ra1Rs6cFx3nRW3s-VuSU",        // 替换你的
+        authDomain: "csong3999-483ce.firebaseapp.com",   // 替换你的
+        databaseURL: "https://csong3999-483ce-default-rtdb.firebaseio.com", // 替换你的 (最重要)
+        projectId: "csong3999-483ce",                    // 替换你的
+        storageBucket: "csong3999-483ce.firebasestorage.app",    // 替换你的
+        messagingSenderId: "986787052842",            // 替换你的
+        appId: "1:986787052842:web:0be03a776f2f52c9dbf253"              // 替换你的
+    };
+
+    // 2. 初始化 Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    // 全局状态
+    let products = [];
+    let chartInstance = null;
+
+    // 3. 核心：监听云端数据变化 (Realtime Database)
+    // 只要数据库变了，这里会自动运行，无需手动刷新
+    db.ref('products').on('value', (snapshot) => {
+        const data = snapshot.val();
+        // 转换数据格式（Firebase返回的是对象，我们转回数组方便处理）
+        if (data) {
+            products = Object.keys(data).map(key => data[key]);
+        } else {
+            products = [];
+        }
+        
+        // 更新界面状态
+        document.getElementById('connectionDot').classList.add('online');
+        document.getElementById('connectionText').innerText = "云端已连接";
+        renderTable();
+    });
+
+    window.onload = () => {
+        document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString();
+        document.getElementById('quoteDate').valueAsDate = new Date();
+    };
+
+    // --- 功能逻辑 ---
+
+    function handleAddProduct() {
+        const brand = document.getElementById('newBrand').value.trim();
+        const name = document.getElementById('newName').value.trim();
+        const fileInput = document.getElementById('newImg');
+        if (!brand || !name) return alert("请填写完整");
+
+        const id = Date.now().toString(); // ID作为字符串
+        const newProduct = { id: id, brand: brand, name: name, image: null, quotes: [] };
+
+        if (fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                newProduct.image = e.target.result;
+                saveToCloud(newProduct); // 上传到云端
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        } else {
+            saveToCloud(newProduct);
+        }
+    }
+
+    // 保存单个产品到云端
+    function saveToCloud(product) {
+        // 使用 set 方法，路径为 products/ID
+        db.ref('products/' + product.id).set(product)
+            .then(() => {
+                closeModal('addProductModal');
+                // 清空输入
+                document.getElementById('newBrand').value = '';
+                document.getElementById('newName').value = '';
+                document.getElementById('newImg').value = '';
+            })
+            .catch((error) => alert("保存失败: " + error.message));
+    }
+
+    function handleAddQuote() {
+        const id = document.getElementById('quoteProductSelect').value;
+        const date = document.getElementById('quoteDate').value;
+        const price = parseFloat(document.getElementById('quotePrice').value);
+        if (!id || !date || isNaN(price)) return alert("请填写完整");
+
+        const product = products.find(p => p.id == id);
+        if (product) {
+            // 初始化 quotes 数组（如果是空的）
+            if (!product.quotes) product.quotes = [];
+
+            const existingIndex = product.quotes.findIndex(q => q.date === date);
+            if (existingIndex >= 0) {
+                product.quotes[existingIndex].price = price;
+            } else {
+                product.quotes.push({ date, price });
+            }
+            // 排序
+            product.quotes.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // 更新云端该产品的 quotes 字段
+            db.ref('products/' + id + '/quotes').set(product.quotes)
+                .then(() => {
+                    closeModal('addQuoteModal');
+                    alert("报价已同步到云端");
+                });
+        }
+    }
+
+    function deleteProduct(id) {
+        if (confirm("确定从云端删除此产品吗？不可恢复。")) {
+            db.ref('products/' + id).remove();
+        }
+    }
+
+    // 渲染表格 (保持原逻辑)
+    function renderTable() {
+        const tbody = document.getElementById('productTableBody');
+        tbody.innerHTML = '';
+        const select = document.getElementById('quoteProductSelect');
+        select.innerHTML = '';
+
+        if (products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">云端暂无数据，请添加产品</td></tr>';
+            return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        products.forEach(p => {
+            // 填充下拉菜单
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = `${p.brand} - ${p.name}`;
+            select.appendChild(option);
+
+            const quotes = p.quotes || [];
+            const todayQuote = quotes.find(q => q.date === today);
+            const latestQuote = quotes.length > 0 ? quotes[quotes.length - 1] : null;
+
+            let priceDisplay = todayQuote ? `<span class="price-badge">¥${todayQuote.price}</span>` : '<span class="no-price">今日未报</span>';
+            let latestDate = latestQuote ? latestQuote.date : '-';
+            const imgUrl = p.image || 'https://via.placeholder.com/50?text=NoImg';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><img src="${imgUrl}" class="product-img-thumb"></td>
+                <td style="font-weight:600; color:#475569;">${p.brand}</td>
+                <td>${p.name}</td>
+                <td>${priceDisplay}</td>
+                <td style="color:#64748b; font-size:0.9em;">${latestDate}</td>
+                <td>
+                    <button class="action-btn view-chart" onclick="showTrend('${p.id}')">📈 趋势图</button>
+                    <button class="action-btn delete" onclick="deleteProduct('${p.id}')">删除</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showTrend(id) {
+        const product = products.find(p => p.id == id); // 注意ID类型转换
+        if (!product) return;
+        document.getElementById('chartTitle').innerText = `${product.brand} ${product.name} - 价格走势`;
+        openModal('chartModal');
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        
+        const quotes = product.quotes || [];
+        const labels = quotes.map(q => q.date);
+        const data = quotes.map(q => q.price);
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '历史报价 (CNY)',
+                    data: data,
+                    borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+        });
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    window.onclick = function(event) { if (event.target.classList.contains('modal-overlay')) event.target.style.display = "none"; }
+</script>
+</body>
+</html>
