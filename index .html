@@ -3,22 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>云端报价系统 (Firebase版)</title>
+    <title>云端报价系统 (Pro版)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <style>
-        /* 样式保持不变，简洁美观 */
-        :root { --primary-color: #2563eb; --sidebar-bg: #1e293b; --text-light: #f8fafc; --bg-color: #f1f5f9; --border-color: #e2e8f0; }
+        :root { --primary-color: #2563eb; --sidebar-bg: #1e293b; --text-light: #f8fafc; --bg-color: #f1f5f9; --border-color: #e2e8f0; --accent-color: #f59e0b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background-color: var(--bg-color); color: #334155; }
-        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: var(--text-light); display: flex; flex-direction: column; padding: 20px; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
-        .brand-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 40px; text-align: center; letter-spacing: 1px; }
-        .nav-btn { background: rgba(255,255,255,0.1); color: white; border: none; padding: 12px; margin-bottom: 10px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.3s; font-size: 14px; }
-        .nav-btn:hover { background: var(--primary-color); }
-        .status-indicator { margin-top: auto; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 5px; }
+        
+        /* --- 侧边栏升级样式 --- */
+        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: var(--text-light); display: flex; flex-direction: column; padding: 20px; box-shadow: 4px 0 10px rgba(0,0,0,0.1); overflow-y: auto; }
+        .brand-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 30px; text-align: center; letter-spacing: 1px; }
+        
+        .nav-section-title { font-size: 0.8rem; text-transform: uppercase; color: #64748b; margin-top: 20px; margin-bottom: 10px; font-weight: bold; letter-spacing: 1px; }
+        
+        .nav-btn { background: rgba(255,255,255,0.05); color: #cbd5e1; border: none; padding: 12px; margin-bottom: 5px; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s; font-size: 14px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-btn.active { background: var(--primary-color); color: white; font-weight: bold; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+        .brand-count { font-size: 0.75em; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 10px; }
+
+        .main-btn { background: var(--primary-color); color: white; font-weight: 600; margin-bottom: 10px; justify-content: center; }
+        .main-btn:hover { background: #1d4ed8; }
+
+        .status-indicator { margin-top: auto; padding-top: 20px; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 5px; }
         .dot { width: 8px; height: 8px; background: #ccc; border-radius: 50%; }
         .dot.online { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
+
+        /* --- 主界面样式 --- */
         .main-content { flex: 1; padding: 30px; overflow-y: auto; }
         .header-section { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
@@ -30,27 +42,40 @@
         .product-img-thumb { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #eee; border: 1px solid #e2e8f0; }
         .price-badge { font-weight: bold; color: #059669; background: #ecfdf5; padding: 4px 8px; border-radius: 4px; }
         .no-price { color: #94a3b8; font-style: italic; font-size: 0.9em; }
-        .action-btn { padding: 6px 12px; border: 1px solid var(--border-color); background: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-right: 5px; transition: 0.2s; }
+        
+        /* 按钮组样式升级 */
+        .action-btn { padding: 6px 10px; border: 1px solid var(--border-color); background: white; border-radius: 6px; cursor: pointer; font-size: 0.85rem; margin-right: 4px; transition: 0.2s; }
+        
+        /* ⚡ 极速报价按钮 */
+        .action-btn.quick-quote { color: #d97706; border-color: #d97706; background-color: #fffbeb; font-weight: bold; }
+        .action-btn.quick-quote:hover { background: #d97706; color: white; }
+        
         .action-btn.view-chart { color: var(--primary-color); border-color: var(--primary-color); }
         .action-btn.view-chart:hover { background: var(--primary-color); color: white; }
         .action-btn.delete { color: #ef4444; border-color: #ef4444; }
         .action-btn.delete:hover { background: #ef4444; color: white; }
+
+        /* 模态框样式 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal { background: white; padding: 30px; border-radius: 12px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative; }
+        .modal { background: white; padding: 30px; border-radius: 12px; width: 450px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); position: relative; }
         .modal-lg { width: 800px; }
         .close-modal { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #94a3b8; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
-        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 1rem; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 1rem; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
         <div class="brand-title">报价系统 Cloud</div>
-        <button class="nav-btn" onclick="openModal('addProductModal')">+ 新增产品</button>
-        <button class="nav-btn" onclick="openModal('addQuoteModal')">+ 录入报价</button>
+        
+        <button class="nav-btn main-btn" onclick="openModal('addProductModal')">+ 新增产品</button>
+        
+        <div class="nav-section-title">品牌筛选 (Brands)</div>
+        <div id="brandListContainer">
+            </div>
         
         <div class="status-indicator">
             <div class="dot" id="connectionDot"></div>
@@ -60,7 +85,7 @@
 
     <main class="main-content">
         <div class="header-section">
-            <h2>云端产品列表</h2>
+            <h2 id="mainTitle">全部产品</h2>
             <div style="color: #64748b; font-size: 0.9rem;" id="currentDateDisplay"></div>
         </div>
 
@@ -68,12 +93,12 @@
             <table>
                 <thead>
                     <tr>
-                        <th width="80">图片</th>
+                        <th width="60">图</th>
                         <th>品牌</th>
-                        <th>产品名称</th>
-                        <th>今日报价</th>
-                        <th>最新报价日期</th>
-                        <th width="200">操作</th>
+                        <th>型号</th>
+                        <th>今日价</th>
+                        <th>更新日期</th>
+                        <th width="220">快捷操作</th>
                     </tr>
                 </thead>
                 <tbody id="productTableBody">
@@ -87,8 +112,8 @@
         <div class="modal">
             <span class="close-modal" onclick="closeModal('addProductModal')">&times;</span>
             <h3>新增产品</h3>
-            <div class="form-group"><label>品牌</label><input type="text" id="newBrand"></div>
-            <div class="form-group"><label>型号</label><input type="text" id="newName"></div>
+            <div class="form-group"><label>品牌</label><input type="text" id="newBrand" placeholder="如: Apple"></div>
+            <div class="form-group"><label>型号</label><input type="text" id="newName" placeholder="如: iPhone 15"></div>
             <div class="form-group"><label>图片</label><input type="file" id="newImg" accept="image/*"></div>
             <button class="btn-primary" onclick="handleAddProduct()">确认添加</button>
         </div>
@@ -98,10 +123,13 @@
         <div class="modal">
             <span class="close-modal" onclick="closeModal('addQuoteModal')">&times;</span>
             <h3>录入报价</h3>
-            <div class="form-group"><label>选择产品</label><select id="quoteProductSelect"></select></div>
+            <div class="form-group"><label>产品</label><select id="quoteProductSelect"></select></div>
             <div class="form-group"><label>日期</label><input type="date" id="quoteDate"></div>
-            <div class="form-group"><label>价格 (CNY)</label><input type="number" id="quotePrice"></div>
-            <button class="btn-primary" onclick="handleAddQuote()">保存报价</button>
+            <div class="form-group">
+                <label>价格 (CNY)</label>
+                <input type="number" id="quotePrice" placeholder="输入价格后按回车" onkeydown="if(event.key==='Enter') handleAddQuote()">
+            </div>
+            <button class="btn-primary" onclick="handleAddQuote()">保存报价 (Enter)</button>
         </div>
     </div>
 
@@ -115,146 +143,134 @@
 
 <script>
     // ==========================================
-    // ⚠️ 此处填入你的 Firebase 配置信息 ⚠️
+    // ⚠️ 请在这里填回你刚才的配置信息 ⚠️
     // ==========================================
     const firebaseConfig = {
-        apiKey: "AIzaSyDsMAUeq9WtEQ4Ra1Rs6cFx3nRW3s-VuSU",        // 替换你的
-        authDomain: "csong3999-483ce.firebaseapp.com",   // 替换你的
-        databaseURL: "https://csong3999-483ce-default-rtdb.firebaseio.com", // 替换你的 (最重要)
-        projectId: "csong3999-483ce",                    // 替换你的
-        storageBucket: "csong3999-483ce.firebasestorage.app",    // 替换你的
-        messagingSenderId: "986787052842",            // 替换你的
-        appId: "1:986787052842:web:0be03a776f2f52c9dbf253"              // 替换你的
+        apiKey: "AIzaSyDMsMAUeq9WtEQ4Ra1Rs6cFx3nRW3s-VuSU",       
+        authDomain: "csong3999-483ce.firebaseapp.com",   
+        databaseURL: "https://csong3999-483ce-default-rtdb.firebaseio.com", 
+        projectId: "csong3999-483ce",                   
+        storageBucket: "csong3999-483ce.firebasestorage.app",   
+        messagingSenderId: "986787052842",            
+        appId: "1:986787052842:web:0be03a776f2f52c9dbf253"             
     };
 
-    // 2. 初始化 Firebase
-    firebase.initializeApp(firebaseConfig);
+    // 初始化
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
     
-    // 全局状态
+    // 全局变量
     let products = [];
+    let currentFilter = 'ALL'; // 当前选中的品牌筛选
     let chartInstance = null;
 
-    // 3. 核心：监听云端数据变化 (Realtime Database)
-    // 只要数据库变了，这里会自动运行，无需手动刷新
+    // 核心：数据监听
     db.ref('products').on('value', (snapshot) => {
         const data = snapshot.val();
-        // 转换数据格式（Firebase返回的是对象，我们转回数组方便处理）
         if (data) {
             products = Object.keys(data).map(key => data[key]);
+            // 按品牌排序
+            products.sort((a, b) => a.brand.localeCompare(b.brand));
         } else {
             products = [];
         }
         
-        // 更新界面状态
-        document.getElementById('connectionDot').classList.add('online');
-        document.getElementById('connectionText').innerText = "云端已连接";
-        renderTable();
+        updateUIStatus(true);
+        renderBrandSidebar(); // 1. 更新侧边栏品牌
+        renderTable();        // 2. 更新表格
     });
 
     window.onload = () => {
         document.getElementById('currentDateDisplay').innerText = new Date().toLocaleDateString();
-        document.getElementById('quoteDate').valueAsDate = new Date();
     };
 
-    // --- 功能逻辑 ---
+    // --- 功能 1：侧边栏品牌筛选 ---
+    function renderBrandSidebar() {
+        const container = document.getElementById('brandListContainer');
+        container.innerHTML = '';
 
-    function handleAddProduct() {
-        const brand = document.getElementById('newBrand').value.trim();
-        const name = document.getElementById('newName').value.trim();
-        const fileInput = document.getElementById('newImg');
-        if (!brand || !name) return alert("请填写完整");
+        // 1. 提取所有唯一品牌并统计数量
+        const brandStats = {};
+        products.forEach(p => {
+            brandStats[p.brand] = (brandStats[p.brand] || 0) + 1;
+        });
+        const brands = Object.keys(brandStats).sort();
 
-        const id = Date.now().toString(); // ID作为字符串
-        const newProduct = { id: id, brand: brand, name: name, image: null, quotes: [] };
+        // 2. 添加“全部”按钮
+        const allBtn = document.createElement('button');
+        allBtn.className = `nav-btn ${currentFilter === 'ALL' ? 'active' : ''}`;
+        allBtn.innerHTML = `<span>全部产品</span> <span class="brand-count">${products.length}</span>`;
+        allBtn.onclick = () => filterByBrand('ALL');
+        container.appendChild(allBtn);
 
-        if (fileInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                newProduct.image = e.target.result;
-                saveToCloud(newProduct); // 上传到云端
-            };
-            reader.readAsDataURL(fileInput.files[0]);
-        } else {
-            saveToCloud(newProduct);
-        }
+        // 3. 添加各个品牌按钮
+        brands.forEach(brand => {
+            const btn = document.createElement('button');
+            btn.className = `nav-btn ${currentFilter === brand ? 'active' : ''}`;
+            btn.innerHTML = `<span>${brand}</span> <span class="brand-count">${brandStats[brand]}</span>`;
+            btn.onclick = () => filterByBrand(brand);
+            container.appendChild(btn);
+        });
     }
 
-    // 保存单个产品到云端
-    function saveToCloud(product) {
-        // 使用 set 方法，路径为 products/ID
-        db.ref('products/' + product.id).set(product)
-            .then(() => {
-                closeModal('addProductModal');
-                // 清空输入
-                document.getElementById('newBrand').value = '';
-                document.getElementById('newName').value = '';
-                document.getElementById('newImg').value = '';
-            })
-            .catch((error) => alert("保存失败: " + error.message));
+    function filterByBrand(brand) {
+        currentFilter = brand;
+        document.getElementById('mainTitle').innerText = brand === 'ALL' ? '全部产品' : `${brand} 产品列表`;
+        renderBrandSidebar(); // 刷新高亮状态
+        renderTable();        // 刷新表格数据
     }
 
-    function handleAddQuote() {
-        const id = document.getElementById('quoteProductSelect').value;
-        const date = document.getElementById('quoteDate').value;
-        const price = parseFloat(document.getElementById('quotePrice').value);
-        if (!id || !date || isNaN(price)) return alert("请填写完整");
-
-        const product = products.find(p => p.id == id);
-        if (product) {
-            // 初始化 quotes 数组（如果是空的）
-            if (!product.quotes) product.quotes = [];
-
-            const existingIndex = product.quotes.findIndex(q => q.date === date);
-            if (existingIndex >= 0) {
-                product.quotes[existingIndex].price = price;
-            } else {
-                product.quotes.push({ date, price });
-            }
-            // 排序
-            product.quotes.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            // 更新云端该产品的 quotes 字段
-            db.ref('products/' + id + '/quotes').set(product.quotes)
-                .then(() => {
-                    closeModal('addQuoteModal');
-                    alert("报价已同步到云端");
-                });
-        }
+    // --- 功能 2：极速报价 ---
+    function openQuickQuote(productId) {
+        // 1. 打开弹窗
+        openModal('addQuoteModal');
+        
+        // 2. 自动选择产品
+        const select = document.getElementById('quoteProductSelect');
+        select.value = productId;
+        
+        // 3. 自动填入今天日期
+        document.getElementById('quoteDate').valueAsDate = new Date();
+        
+        // 4. 清空价格并聚焦 (用户可以直接打字)
+        const priceInput = document.getElementById('quotePrice');
+        priceInput.value = '';
+        
+        // 延迟聚焦，确保弹窗动画完成
+        setTimeout(() => priceInput.focus(), 100);
     }
 
-    function deleteProduct(id) {
-        if (confirm("确定从云端删除此产品吗？不可恢复。")) {
-            db.ref('products/' + id).remove();
-        }
-    }
-
-    // 渲染表格 (保持原逻辑)
+    // --- 渲染表格 ---
     function renderTable() {
         const tbody = document.getElementById('productTableBody');
         tbody.innerHTML = '';
-        const select = document.getElementById('quoteProductSelect');
-        select.innerHTML = '';
+        
+        // 更新下拉菜单（无论筛选如何，下拉菜单里应该有所有产品）
+        updateProductSelect();
 
-        if (products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px;">云端暂无数据，请添加产品</td></tr>';
+        // 根据筛选条件过滤数据
+        let displayProducts = products;
+        if (currentFilter !== 'ALL') {
+            displayProducts = products.filter(p => p.brand === currentFilter);
+        }
+
+        if (displayProducts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px;">没有找到产品</td></tr>';
             return;
         }
 
         const today = new Date().toISOString().split('T')[0];
 
-        products.forEach(p => {
-            // 填充下拉菜单
-            const option = document.createElement('option');
-            option.value = p.id;
-            option.textContent = `${p.brand} - ${p.name}`;
-            select.appendChild(option);
-
+        displayProducts.forEach(p => {
             const quotes = p.quotes || [];
             const todayQuote = quotes.find(q => q.date === today);
             const latestQuote = quotes.length > 0 ? quotes[quotes.length - 1] : null;
 
-            let priceDisplay = todayQuote ? `<span class="price-badge">¥${todayQuote.price}</span>` : '<span class="no-price">今日未报</span>';
+            let priceDisplay = todayQuote ? 
+                `<span class="price-badge">¥${todayQuote.price}</span>` : 
+                '<span class="no-price">今日未报</span>';
             let latestDate = latestQuote ? latestQuote.date : '-';
             const imgUrl = p.image || 'https://via.placeholder.com/50?text=NoImg';
 
@@ -266,18 +282,104 @@
                 <td>${priceDisplay}</td>
                 <td style="color:#64748b; font-size:0.9em;">${latestDate}</td>
                 <td>
-                    <button class="action-btn view-chart" onclick="showTrend('${p.id}')">📈 趋势图</button>
-                    <button class="action-btn delete" onclick="deleteProduct('${p.id}')">删除</button>
+                    <button class="action-btn quick-quote" onclick="openQuickQuote('${p.id}')">⚡ 报价</button>
+                    <button class="action-btn view-chart" onclick="showTrend('${p.id}')">📈 趋势</button>
+                    <button class="action-btn delete" onclick="deleteProduct('${p.id}')">🗑️</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     }
 
+    // --- 标准数据操作逻辑 ---
+
+    function handleAddProduct() {
+        const brand = document.getElementById('newBrand').value.trim();
+        const name = document.getElementById('newName').value.trim();
+        const fileInput = document.getElementById('newImg');
+        
+        if (!brand || !name) return alert("请填写完整");
+        const id = Date.now().toString();
+        const newProduct = { id, brand, name, image: null, quotes: [] };
+
+        if (fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                newProduct.image = e.target.result;
+                saveToCloud(newProduct);
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        } else {
+            saveToCloud(newProduct);
+        }
+    }
+
+    function saveToCloud(product) {
+        db.ref('products/' + product.id).set(product).then(() => {
+            closeModal('addProductModal');
+            document.getElementById('newBrand').value = '';
+            document.getElementById('newName').value = '';
+            document.getElementById('newImg').value = '';
+        }).catch(e => alert(e.message));
+    }
+
+    function handleAddQuote() {
+        const id = document.getElementById('quoteProductSelect').value;
+        const date = document.getElementById('quoteDate').value;
+        const price = parseFloat(document.getElementById('quotePrice').value);
+        
+        if (!id || !date || isNaN(price)) return alert("请填写完整");
+
+        const product = products.find(p => p.id == id);
+        if (product) {
+            if (!product.quotes) product.quotes = [];
+            const existingIndex = product.quotes.findIndex(q => q.date === date);
+            
+            if (existingIndex >= 0) {
+                product.quotes[existingIndex].price = price;
+            } else {
+                product.quotes.push({ date, price });
+            }
+            product.quotes.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            db.ref('products/' + id + '/quotes').set(product.quotes).then(() => {
+                closeModal('addQuoteModal');
+                // 不弹窗打扰，提供更流畅的体验
+                // alert("报价已同步"); 
+            });
+        }
+    }
+
+    function deleteProduct(id) {
+        if (confirm("确定删除此产品吗？")) db.ref('products/' + id).remove();
+    }
+
+    // --- 辅助函数 ---
+    function updateProductSelect() {
+        const select = document.getElementById('quoteProductSelect');
+        select.innerHTML = '';
+        // 这里始终显示所有产品，方便在任何视图下录入
+        products.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.id;
+            option.textContent = `${p.brand} - ${p.name}`;
+            select.appendChild(option);
+        });
+    }
+
+    function updateUIStatus(isOnline) {
+        const dot = document.getElementById('connectionDot');
+        const text = document.getElementById('connectionText');
+        if (isOnline) {
+            dot.classList.add('online');
+            text.innerText = "云端已连接";
+        }
+    }
+
     function showTrend(id) {
-        const product = products.find(p => p.id == id); // 注意ID类型转换
+        const product = products.find(p => p.id == id);
         if (!product) return;
-        document.getElementById('chartTitle').innerText = `${product.brand} ${product.name} - 价格走势`;
+        document.getElementById('chartTitle').innerText = `${product.brand} ${product.name} - 走势`;
         openModal('chartModal');
         const ctx = document.getElementById('trendChart').getContext('2d');
         if (chartInstance) chartInstance.destroy();
@@ -291,19 +393,18 @@
             data: {
                 labels: labels,
                 datasets: [{
-                    label: '历史报价 (CNY)',
-                    data: data,
+                    label: '价格', data: data,
                     borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    borderWidth: 2, fill: true, tension: 0.4, pointRadius: 4
+                    borderWidth: 2, fill: true, tension: 0.4
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: false } } }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    window.onclick = function(event) { if (event.target.classList.contains('modal-overlay')) event.target.style.display = "none"; }
+    window.onclick = (e) => { if (e.target.classList.contains('modal-overlay')) e.target.style.display = "none"; }
 </script>
 </body>
 </html>
