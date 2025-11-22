@@ -40,7 +40,12 @@
         td { padding: 16px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
         tr:hover { background-color: #f8fafc; }
         .product-img-thumb { width: 50px; height: 50px; border-radius: 6px; object-fit: cover; background: #eee; border: 1px solid #e2e8f0; }
-        .price-badge { font-weight: bold; color: #059669; background: #ecfdf5; padding: 4px 8px; border-radius: 4px; }
+        
+        /* 价格标签样式 */
+        .price-badge { font-weight: bold; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .price-badge.fresh { color: #059669; background: #ecfdf5; border: 1px solid #d1fae5; } /* 今日已更: 绿色 */
+        .price-badge.stale { color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; } /* 今日未更: 灰色 */
+
         .no-price { color: #94a3b8; font-style: italic; font-size: 0.9em; }
         
         /* 按钮组样式升级 */
@@ -96,8 +101,7 @@
                         <th width="60">图</th>
                         <th>品牌</th>
                         <th>型号</th>
-                        <th>今日价</th>
-                        <th>更新日期</th>
+                        <th>当前价格</th> <th>更新日期</th>
                         <th width="220">快捷操作</th>
                     </tr>
                 </thead>
@@ -163,7 +167,7 @@
     
     // 全局变量
     let products = [];
-    let currentFilter = 'ALL'; // 当前选中的品牌筛选
+    let currentFilter = 'ALL'; 
     let chartInstance = null;
 
     // 核心：数据监听
@@ -171,15 +175,14 @@
         const data = snapshot.val();
         if (data) {
             products = Object.keys(data).map(key => data[key]);
-            // 按品牌排序
             products.sort((a, b) => a.brand.localeCompare(b.brand));
         } else {
             products = [];
         }
         
         updateUIStatus(true);
-        renderBrandSidebar(); // 1. 更新侧边栏品牌
-        renderTable();        // 2. 更新表格
+        renderBrandSidebar(); 
+        renderTable();
     });
 
     window.onload = () => {
@@ -191,21 +194,18 @@
         const container = document.getElementById('brandListContainer');
         container.innerHTML = '';
 
-        // 1. 提取所有唯一品牌并统计数量
         const brandStats = {};
         products.forEach(p => {
             brandStats[p.brand] = (brandStats[p.brand] || 0) + 1;
         });
         const brands = Object.keys(brandStats).sort();
 
-        // 2. 添加“全部”按钮
         const allBtn = document.createElement('button');
         allBtn.className = `nav-btn ${currentFilter === 'ALL' ? 'active' : ''}`;
         allBtn.innerHTML = `<span>全部产品</span> <span class="brand-count">${products.length}</span>`;
         allBtn.onclick = () => filterByBrand('ALL');
         container.appendChild(allBtn);
 
-        // 3. 添加各个品牌按钮
         brands.forEach(brand => {
             const btn = document.createElement('button');
             btn.className = `nav-btn ${currentFilter === brand ? 'active' : ''}`;
@@ -218,39 +218,28 @@
     function filterByBrand(brand) {
         currentFilter = brand;
         document.getElementById('mainTitle').innerText = brand === 'ALL' ? '全部产品' : `${brand} 产品列表`;
-        renderBrandSidebar(); // 刷新高亮状态
-        renderTable();        // 刷新表格数据
+        renderBrandSidebar(); 
+        renderTable();      
     }
 
     // --- 功能 2：极速报价 ---
     function openQuickQuote(productId) {
-        // 1. 打开弹窗
         openModal('addQuoteModal');
-        
-        // 2. 自动选择产品
         const select = document.getElementById('quoteProductSelect');
         select.value = productId;
-        
-        // 3. 自动填入今天日期
         document.getElementById('quoteDate').valueAsDate = new Date();
-        
-        // 4. 清空价格并聚焦 (用户可以直接打字)
         const priceInput = document.getElementById('quotePrice');
         priceInput.value = '';
-        
-        // 延迟聚焦，确保弹窗动画完成
         setTimeout(() => priceInput.focus(), 100);
     }
 
-    // --- 渲染表格 ---
+    // --- 渲染表格 (核心修改逻辑在此) ---
     function renderTable() {
         const tbody = document.getElementById('productTableBody');
         tbody.innerHTML = '';
         
-        // 更新下拉菜单（无论筛选如何，下拉菜单里应该有所有产品）
         updateProductSelect();
 
-        // 根据筛选条件过滤数据
         let displayProducts = products;
         if (currentFilter !== 'ALL') {
             displayProducts = products.filter(p => p.brand === currentFilter);
@@ -268,9 +257,21 @@
             const todayQuote = quotes.find(q => q.date === today);
             const latestQuote = quotes.length > 0 ? quotes[quotes.length - 1] : null;
 
-            let priceDisplay = todayQuote ? 
-                `<span class="price-badge">¥${todayQuote.price}</span>` : 
-                '<span class="no-price">今日未报</span>';
+            // --- 价格显示逻辑修改 ---
+            let priceDisplay = '';
+            
+            if (todayQuote) {
+                // 情况1：今天已更新 -> 绿色高亮
+                priceDisplay = `<span class="price-badge fresh">¥${todayQuote.price}</span>`;
+            } else if (latestQuote) {
+                // 情况2：今天没更，但有历史价 -> 显示历史价 (灰色)
+                priceDisplay = `<span class="price-badge stale">¥${latestQuote.price}</span>`;
+            } else {
+                // 情况3：全新产品，从未报价
+                priceDisplay = '<span class="no-price">暂无</span>';
+            }
+            // ---------------------
+
             let latestDate = latestQuote ? latestQuote.date : '-';
             const imgUrl = p.image || 'https://via.placeholder.com/50?text=NoImg';
 
@@ -344,8 +345,6 @@
 
             db.ref('products/' + id + '/quotes').set(product.quotes).then(() => {
                 closeModal('addQuoteModal');
-                // 不弹窗打扰，提供更流畅的体验
-                // alert("报价已同步"); 
             });
         }
     }
@@ -358,7 +357,6 @@
     function updateProductSelect() {
         const select = document.getElementById('quoteProductSelect');
         select.innerHTML = '';
-        // 这里始终显示所有产品，方便在任何视图下录入
         products.forEach(p => {
             const option = document.createElement('option');
             option.value = p.id;
